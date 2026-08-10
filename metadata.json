@@ -1,0 +1,6 @@
+{
+  "name": "Tic Tac Toe Online",
+  "description": "Live online multiplayer Tic-Tac-Toe game with custom profile setup, room code matchmaking, sound effects, and win leaderboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User Profile Documents
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if true;
+    }
+    
+    // Game Rooms Documents
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if true;
+    }
+  }
+}
