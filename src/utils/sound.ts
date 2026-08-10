@@ -160,6 +160,10 @@ class SoundEffects {
     }
   }
 
+  public playSuccess() {
+    this.playWin();
+  }
+
   public playMatchFound() {
     if (!this.enabled) return;
     try {

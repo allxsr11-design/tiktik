@@ -38,7 +38,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           list.push({
             id: doc.id,
             name: data.name,
+            tagId: data.tagId || '#100000',
             avatar: data.avatar || '⚡',
+            coins: data.coins || 0,
             wins,
             losses: data.losses || 0,
             draws: data.draws || 0,

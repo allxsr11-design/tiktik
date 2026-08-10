@@ -1,17 +1,20 @@
 import { PlayerProfile } from '../types';
 import { db } from '../firebase/config';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { generateTagId } from './gameLogic';
 
 const STORAGE_KEY = 'tictactoe_player_profile';
 
 export const AVATAR_OPTIONS = [
-  '🎯', '⚡', '👑', '🐯', '🤖', '🔥', '💎', '🐉', '🎮', '🚀', '🦊', '👾'
+  '🎯', '⚡', '👑', '🐯', '🤖', '🔥', '💎', '🐉', '🎮', '🚀', '🦊', '👾', '🦁', '🦅'
 ];
 
 export const DEFAULT_PROFILE: PlayerProfile = {
   id: '',
+  tagId: '#100000',
   name: '',
   avatar: '⚡',
+  coins: 500, // 500 Welcome Bonus Coins
   wins: 0,
   losses: 0,
   draws: 0,
@@ -22,7 +25,13 @@ export function getStoredProfile(): PlayerProfile {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      return {
+        ...DEFAULT_PROFILE,
+        ...parsed,
+        tagId: parsed.tagId || generateTagId(),
+        coins: typeof parsed.coins === 'number' ? parsed.coins : 500,
+      };
     }
   } catch (e) {
     console.error('Failed to read local profile:', e);
@@ -37,8 +46,10 @@ export function getStoredProfile(): PlayerProfile {
   const profile: PlayerProfile = {
     ...DEFAULT_PROFILE,
     id: randomId,
+    tagId: generateTagId(),
     name: randomName,
     avatar: randomAvatar,
+    coins: 500,
   };
 
   saveStoredProfile(profile);
@@ -78,3 +89,6 @@ export async function fetchProfileFromFirestore(userId: string): Promise<PlayerP
   }
   return null;
 }
+
+export const getUserProfileFromFirestore = fetchProfileFromFirestore;
+

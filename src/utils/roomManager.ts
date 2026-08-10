@@ -1,6 +1,6 @@
 import { db, initAuth } from '../firebase/config';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
-import { GameRoom, ChatMessage, PlayerProfile } from '../types';
+import { GameRoom, ChatMessage, PlayerProfile, GridSize } from '../types';
 import { generateRoomCode } from './gameLogic';
 
 const LOCAL_ROOMS_KEY = 'tictactoe_local_rooms';
@@ -31,20 +31,26 @@ function saveLocalRoom(room: GameRoom) {
 // 1. Create Quick or Private Room
 export async function createOnlineRoom(
   profile: PlayerProfile,
-  mode: 'quick' | 'private'
+  mode: 'quick' | 'private',
+  gridSize: GridSize = 3,
+  betCoins: number = 0
 ): Promise<{ room: GameRoom; isLocalFallback: boolean }> {
   await initAuth();
 
   const roomId = 'rm_' + Math.random().toString(36).substring(2, 9);
   const code = generateRoomCode();
+  const boardSize = gridSize === 4 ? 16 : 9;
 
   const newRoom: GameRoom = {
     id: roomId,
     roomCode: code,
     mode,
+    gridSize,
+    betCoins,
     status: 'waiting',
-    board: Array(9).fill(null),
+    board: Array(boardSize).fill(null),
     turn: 'X',
+    startingTurn: 'X',
     player1: {
       id: profile.id,
       name: profile.name,
@@ -72,11 +78,15 @@ export async function createOnlineRoom(
   }
 }
 
-// 2. Find and Join Quick Match
+// 2. Find and Join Quick Match (Filter out inactive rooms > 3 mins old)
 export async function findOrJoinQuickMatch(
-  profile: PlayerProfile
+  profile: PlayerProfile,
+  gridSize: GridSize = 3,
+  betCoins: number = 0
 ): Promise<{ room: GameRoom; isLocalFallback: boolean }> {
   await initAuth();
+  const now = Date.now();
+  const THREE_MINUTES = 3 * 60 * 1000;
 
   try {
     // 1. Try Firestore first
@@ -90,7 +100,12 @@ export async function findOrJoinQuickMatch(
     if (!snap.empty) {
       for (const roomDoc of snap.docs) {
         const data = roomDoc.data() as GameRoom;
-        if (data.player1.id !== profile.id) {
+        
+        // Ensure room matches requested grid & bet, and is NOT stale/dead (created within 3 minutes)
+        const isFresh = (now - (data.createdAt || 0)) < THREE_MINUTES;
+        const isSameMode = (data.gridSize || 3) === gridSize && (data.betCoins || 0) === betCoins;
+
+        if (data.player1.id !== profile.id && isFresh && isSameMode) {
           const updatedRoom: GameRoom = {
             ...data,
             status: 'playing',
@@ -114,15 +129,21 @@ export async function findOrJoinQuickMatch(
       }
     }
 
-    // No open room found in Firestore -> Create new
-    return await createOnlineRoom(profile, 'quick');
+    // No open fresh room found in Firestore -> Create new
+    return await createOnlineRoom(profile, 'quick', gridSize, betCoins);
   } catch (err: any) {
     console.warn('Firestore quick match error, trying local sync:', err?.message || err);
 
     // Fallback: Check local storage rooms
     const rooms = getLocalRooms();
     const openRoom = Object.values(rooms).find(
-      (r) => r.mode === 'quick' && r.status === 'waiting' && r.player1.id !== profile.id
+      (r) =>
+        r.mode === 'quick' &&
+        r.status === 'waiting' &&
+        r.player1.id !== profile.id &&
+        (now - (r.createdAt || 0)) < THREE_MINUTES &&
+        (r.gridSize || 3) === gridSize &&
+        (r.betCoins || 0) === betCoins
     );
 
     if (openRoom) {
@@ -141,7 +162,7 @@ export async function findOrJoinQuickMatch(
       return { room: updatedRoom, isLocalFallback: true };
     }
 
-    return await createOnlineRoom(profile, 'quick');
+    return await createOnlineRoom(profile, 'quick', gridSize, betCoins);
   }
 }
 
@@ -318,3 +339,4 @@ export function subscribeToOnlineRoom(
     window.removeEventListener('storage', handleStorage);
   };
 }
+
